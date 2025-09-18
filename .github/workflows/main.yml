@@ -1,0 +1,51 @@
+name: Build Android App (Errors Only)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    env:
+      JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.16-8/x64
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v2
+      with:
+        api-level: 33
+        build-tools: '33.0.2'
+
+    - name: Build APK and capture errors
+      working-directory: extracted-server  # <- Already extracted app folder
+      run: |
+        chmod +x ./gradlew
+        # Run Gradle build and save full log
+        ./gradlew clean assembleDebug --stacktrace > full-build.log 2>&1 || true
+        # Extract only errors
+        grep -i -A 5 -B 5 "error:" full-build.log > build-errors.log || true
+
+    - name: Upload APK if build succeeds
+      if: success() && exists('hippo/app/build/outputs/apk/debug/app-debug.apk')
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-apk
+        path: hippo/app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload build errors
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-errors
+        path: hippo/build-errors.log
