@@ -1,2 +1,9 @@
-Build triggered at: 2025-09-18T11:23:20.065Z
-Previous content: Build triggered at $(date)
+🚀 IMPROVED WORKFLOW BUILD - 2025-09-18T11:25:49.003Z
+
+✨ New features:
+- Simplified 3-attempt build strategy
+- Progressive error fixes between attempts  
+- Better logging and debugging
+- Guaranteed artifact upload (success or debug logs)
+
+Target: Redmi 9 Activ Android APK
