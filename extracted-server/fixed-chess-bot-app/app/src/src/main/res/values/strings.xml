@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chess Bot</string>
+    <string name="accessibility_service_description">Chess Bot Tap Automation Service</string>
+    <string name="start_game">Start Game</string>
+    <string name="pause_game">Pause</string>
+    <string name="resume_game">Resume</string>
+    <string name="stop_game">Stop</string>
+    <string name="flip_board">Flip Board</string>
+    <string name="overlay_notification_title">Chess Bot Running</string>
+    <string name="overlay_notification_text">Tap automation active</string>
+</resources>
