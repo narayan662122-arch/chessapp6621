@@ -1,4 +1,4 @@
-name: Build Android APK from server.zip (Enhanced)
+name: Chess Bot APK Builder (Specialized for Kotlin)
 
 on:
   workflow_dispatch:
@@ -6,14 +6,14 @@ on:
     branches: [ main ]
 
 jobs:
-  build-apk:
+  build-chess-bot-apk:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
+    - name: Checkout repository  
       uses: actions/checkout@v4
       
-    - name: Set up JDK 17
+    - name: Set up JDK 17 for Kotlin
       uses: actions/setup-java@v4
       with:
         java-version: '17'
@@ -22,216 +22,181 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Install Android SDK components
+    - name: Install Android SDK components for API 29 (Redmi 9 Activ)
       run: |
-        echo "Installing required Android SDK components..."
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29" "build-tools;29.0.3" "platform-tools"
+        echo "Installing Android SDK components for Redmi 9 Activ..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29" "build-tools;29.0.3" "platform-tools" "ndk;21.4.7075529"
         
-    - name: Extract and analyze server.zip
+    - name: Extract Chess Bot App
       run: |
-        echo "=== EXTRACTING SERVER.ZIP ==="
-        unzip -v server.zip
+        echo "🚀 EXTRACTING CHESS BOT APP"
+        unzip -q server.zip
+        echo "✅ Extraction complete"
+        
+        echo "📁 Chess Bot Project Structure:"
+        ls -la fixed-chess-bot-app/
+        
+        echo "📱 App Directory:"
+        ls -la fixed-chess-bot-app/app/
+        
+    - name: Configure Kotlin Build for Redmi 9 Activ
+      run: |
+        cd fixed-chess-bot-app
+        
+        echo "🔧 CONFIGURING FOR REDMI 9 ACTIV"
+        echo "Target: Android 10 (API 29), arm64-v8a"
+        
+        # Make gradlew executable
+        chmod +x gradlew
+        
+        echo "📝 Current build configuration:"
+        cat app/build.gradle.kts
+        
         echo ""
-        echo "Extracting server.zip..."
-        unzip server.zip -d extracted_app/
+        echo "🎯 Optimizing for Redmi 9 Activ..."
         
-        echo ""
-        echo "=== ANALYZING EXTRACTED CONTENTS ==="
-        find extracted_app/ -type f -name "*.apk" | head -5 || echo "No APK files found"
-        find extracted_app/ -type f -name "*.aab" | head -5 || echo "No AAB files found"
-        find extracted_app/ -name "build.gradle*" | head -10 || echo "No build.gradle files found"
-        find extracted_app/ -name "gradlew*" | head -5 || echo "No gradlew files found"
-        find extracted_app/ -name "AndroidManifest.xml" | head -5 || echo "No AndroidManifest.xml found"
-        find extracted_app/ -name "src" -type d | head -5 || echo "No src directories found"
+        # Backup original build file
+        cp app/build.gradle.kts app/build.gradle.kts.backup
         
-        echo ""
-        echo "=== DIRECTORY STRUCTURE ==="
-        ls -la extracted_app/
+        # Configure build for Redmi 9 Activ
+        cat > app/build.gradle.kts << 'BUILD_EOF'
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.chessbot"
+    compileSdk = 29
+    
+    defaultConfig {
+        applicationId = "com.chessbot.redmi9activ"
+        minSdk = 21
+        targetSdk = 29
+        versionCode = 1
+        versionName = "1.0-Redmi9Activ"
         
-        if [ -d "extracted_app/" ]; then
-          find extracted_app/ -maxdepth 3 -type d | head -15
-        fi
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+    
+    packagingOptions {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    implementation(files("libs/json-20231013.jar"))
+    implementation(files("libs/kotlinx-coroutines-core-1.7.3.jar"))  
+    implementation(files("libs/okhttp-4.12.0.jar"))
+    implementation("androidx.core:core-ktx:1.6.0")
+    implementation("androidx.appcompat:appcompat:1.3.1")
+    implementation("com.google.android.material:material:1.4.0")
+}
+BUILD_EOF
+
+        echo "✅ Build configuration updated for Redmi 9 Activ"
+        echo "📝 New configuration:"
+        cat app/build.gradle.kts
         
-    - name: Check for pre-built APK files
+    - name: Build Chess Bot APK
       run: |
-        echo "=== CHECKING FOR PRE-BUILT APKs ==="
-        APK_FILES=$(find extracted_app/ -name "*.apk" -type f | head -10)
+        cd fixed-chess-bot-app
         
-        if [ -n "$APK_FILES" ]; then
-          echo "✅ Found pre-built APK files:"
-          echo "$APK_FILES"
-          
-          # Create upload directory and copy APKs
-          mkdir -p apk_output
-          for apk in $APK_FILES; do
-            APK_NAME=$(basename "$apk")
-            NEW_NAME="ChessApp6621-PreBuilt-Redmi9Activ-${APK_NAME}"
-            cp "$apk" "apk_output/${NEW_NAME}"
-            echo "✅ Prepared: $apk -> apk_output/${NEW_NAME}"
-          done
-          
-          echo "APK_FOUND=true" >> $GITHUB_ENV
-          ls -la apk_output/
-        else
-          echo "ℹ️  No pre-built APK files found. Will attempt to build from source."
-          echo "APK_FOUND=false" >> $GITHUB_ENV
-        fi
+        echo "🏗️  BUILDING CHESS BOT APK"
+        echo "Target: Redmi 9 Activ (Android 10, API 29, arm64-v8a)"
         
-    - name: Find Android project root
-      if: env.APK_FOUND == 'false'
+        # Clean and build
+        echo "🧹 Cleaning project..."
+        ./gradlew clean --stacktrace
+        
+        echo "🔨 Building Release APK..."
+        ./gradlew assembleRelease --stacktrace --info
+        
+        echo "🔍 Searching for APK files..."
+        find . -name "*.apk" -type f
+        
+    - name: Prepare Chess Bot APK for Download
       run: |
-        echo "=== FINDING ANDROID PROJECT ROOT ==="
+        cd fixed-chess-bot-app
         
-        # Look for gradlew files first
-        if [ -f "extracted_app/gradlew" ]; then
-          PROJECT_ROOT="extracted_app"
-        elif find extracted_app/ -name "gradlew" -type f | head -1; then
-          PROJECT_ROOT=$(find extracted_app/ -name "gradlew" -type f -printf '%h\n' | head -1)
-        elif find extracted_app/ -name "build.gradle" -type f | head -1; then
-          # Look for build.gradle files
-          PROJECT_ROOT=$(find extracted_app/ -name "build.gradle" -type f -printf '%h\n' | head -1)
-        else
-          echo "❌ No Android project structure found!"
-          echo "Contents of extracted_app/:"
-          find extracted_app/ -type f | head -20
+        echo "📦 PREPARING APK FOR DOWNLOAD"
+        
+        # Find APK files
+        APK_FILES=$(find . -name "*.apk" -type f)
+        
+        if [ -z "$APK_FILES" ]; then
+          echo "❌ No APK files found!"
+          echo "🔍 Checking build outputs..."
+          find . -path "*/build/outputs/*" -type f | head -10
           exit 1
         fi
         
-        echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
-        echo "✅ Project root found at: $PROJECT_ROOT"
+        echo "✅ Found APK files:"
+        echo "$APK_FILES"
         
-        echo "=== PROJECT STRUCTURE ==="
-        ls -la $PROJECT_ROOT/
+        # Create output directory
+        mkdir -p ../chess_bot_apk
         
-        if [ -f "$PROJECT_ROOT/settings.gradle" ]; then
-          echo "settings.gradle content:"
-          cat $PROJECT_ROOT/settings.gradle
-        fi
-        
-    - name: Make gradlew executable and configure build
-      if: env.APK_FOUND == 'false'
-      run: |
-        cd $PROJECT_ROOT
-        
-        if [ -f "gradlew" ]; then
-          chmod +x gradlew
-          echo "✅ Made gradlew executable"
-        fi
-        
-        echo "=== GRADLE WRAPPER VERSION ==="
-        if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-          cat gradle/wrapper/gradle-wrapper.properties
-        fi
-        
-        echo "=== CONFIGURING BUILD FOR REDMI 9 ACTIV ==="
-        if [ -f "app/build.gradle" ]; then
-          echo "Found app/build.gradle"
-          cp app/build.gradle app/build.gradle.backup
+        # Copy and rename APK for Redmi 9 Activ
+        for apk in $APK_FILES; do
+          APK_SIZE=$(du -h "$apk" | cut -f1)
+          APK_NAME=$(basename "$apk")
+          NEW_NAME="ChessBotApp-Redmi9Activ-${APK_NAME}"
           
-          # Show current configuration
-          echo "Current configuration:"
-          grep -E "compileSdk|targetSdk|minSdk|compileSdkVersion|targetSdkVersion|minSdkVersion" app/build.gradle || echo "SDK versions not found in expected format"
+          cp "$apk" "../chess_bot_apk/${NEW_NAME}"
           
-        elif [ -f "build.gradle" ]; then
-          echo "Found root build.gradle"
-          cp build.gradle build.gradle.backup
-        fi
-        
-    - name: Build APK
-      if: env.APK_FOUND == 'false'
-      run: |
-        cd $PROJECT_ROOT
-        
-        echo "=== STARTING APK BUILD ==="
-        echo "Java version:"
-        java -version
-        
-        echo "Android SDK location: $ANDROID_HOME"
-        
-        # Build the project
-        if [ -f "gradlew" ]; then
-          echo "Using gradlew to build..."
-          ./gradlew --version
-          ./gradlew clean --stacktrace || echo "Clean failed, continuing..."
-          
-          # Try different build variants
-          echo "Attempting assembleRelease..."
-          ./gradlew assembleRelease --stacktrace --info || {
-            echo "assembleRelease failed, trying assembleDebug..."
-            ./gradlew assembleDebug --stacktrace --info || {
-              echo "assembleDebug failed, trying build..."
-              ./gradlew build --stacktrace --info
-            }
-          }
-        else
-          echo "Using gradle to build..."
-          gradle clean
-          gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace || gradle build --stacktrace
-        fi
-        
-        echo "=== BUILD COMPLETE - SEARCHING FOR APK FILES ==="
-        find . -name "*.apk" -type f | head -10
-        
-    - name: Prepare APK files for upload
-      run: |
-        echo "=== PREPARING APK FILES ==="
-        
-        if [ "$APK_FOUND" = "true" ]; then
-          echo "Using pre-built APK files"
-        else
-          cd $PROJECT_ROOT
-          
-          # Find all APK files
-          APK_FILES=$(find . -name "*.apk" -type f | head -10)
-          
-          if [ -z "$APK_FILES" ]; then
-            echo "❌ No APK files found after build!"
-            echo "=== DEBUGGING - BUILD OUTPUTS ==="
-            find . -name "outputs" -type d | head -5
-            find . -name "build" -type d | head -5
-            find . -path "*/build/outputs/*" -type f | head -10
-            exit 1
-          fi
-          
-          echo "✅ Found APK files:"
-          echo "$APK_FILES"
-          
-          # Create upload directory if not exists
-          mkdir -p apk_output
-          
-          # Copy APK files to upload directory
-          for apk in $APK_FILES; do
-            APK_NAME=$(basename "$apk")
-            NEW_NAME="ChessApp6621-Built-Redmi9Activ-${APK_NAME}"
-            cp "$apk" "apk_output/${NEW_NAME}"
-            echo "✅ Prepared: $apk -> apk_output/${NEW_NAME}"
-          done
-        fi
-        
-        echo "=== FINAL APK FILES ==="
-        ls -la apk_output/
-        
-        for apk in apk_output/*.apk; do
-          if [ -f "$apk" ]; then
-            echo "📱 APK: $(basename $apk) ($(du -h $apk | cut -f1))"
-          fi
+          echo "📱 Created: ${NEW_NAME} (${APK_SIZE})"
         done
         
-    - name: Upload APK artifacts
+        echo ""
+        echo "📱 FINAL APK FILES FOR REDMI 9 ACTIV:"
+        ls -lah ../chess_bot_apk/
+        
+    - name: Upload Chess Bot APK
       uses: actions/upload-artifact@v4
       with:
-        name: ChessApp6621-APK-Redmi9Activ-Enhanced
-        path: apk_output/*.apk
+        name: ChessBotApp-Redmi9Activ-APK
+        path: chess_bot_apk/*.apk
         retention-days: 30
         
-    - name: Build Summary
+    - name: Success Summary
       run: |
-        echo "🎉 APK BUILD PROCESS COMPLETED!"
-        echo "📱 Target Device: Redmi 9 Activ (Android 10, API 29, arm64-v8a)"
-        echo "📦 Artifacts: ChessApp6621-APK-Redmi9Activ-Enhanced"
-        echo "⬇️  Download your APK from GitHub Actions artifacts"
+        echo "🎉 CHESS BOT APK BUILD SUCCESSFUL!"
         echo ""
-        echo "APK Files Created:"
-        find apk_output/ -name "*.apk" -exec ls -lh {} \; 2>/dev/null | while read -r line; do
-          echo "📱 $line"
-        done || echo "Check artifacts for APK files"
+        echo "📱 App: Chess Bot for Redmi 9 Activ"
+        echo "🎯 Target: Android 10 (API 29), arm64-v8a architecture" 
+        echo "📦 Artifact: ChessBotApp-Redmi9Activ-APK"
+        echo "⬇️  Download: GitHub Actions → Artifacts"
+        echo ""
+        echo "✅ Your chess bot APK is ready for installation on Redmi 9 Activ!"
+        
+        if [ -d "chess_bot_apk" ]; then
+          echo ""
+          echo "📁 Created APK files:"
+          for apk in chess_bot_apk/*.apk; do
+            if [ -f "$apk" ]; then
+              SIZE=$(du -h "$apk" | cut -f1)
+              echo "  📱 $(basename $apk) ($SIZE)"
+            fi
+          done
+        fi
