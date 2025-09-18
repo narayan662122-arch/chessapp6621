@@ -1,0 +1,251 @@
+name: Direct Fix Chess Bot APK Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ☕ Set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        
+    - name: 📦 Extract and Fix server.zip In-Place
+      run: |
+        echo "📦 Extracting server.zip..."
+        unzip -o server.zip
+        cd fixed-chess-bot-app
+        
+        echo "🔧 Fixing build configuration in-place..."
+        
+        # Remove conflicting files
+        rm -f build.gradle.kts settings.gradle.kts app/build.gradle.kts
+        
+        # Create corrected root build.gradle
+        cat > build.gradle << 'EOF'
+buildscript {
+    ext.kotlin_version = '1.8.10'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+EOF
+        
+        # Create corrected settings.gradle
+        cat > settings.gradle << 'EOF'
+rootProject.name = 'ChessBot'
+include ':app'
+EOF
+        
+        # Create corrected app/build.gradle
+        cat > app/build.gradle << 'EOF'
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.chessbot'
+    compileSdk 29
+
+    defaultConfig {
+        applicationId 'com.chessbot'
+        minSdk 24
+        targetSdk 29
+        versionCode 1
+        versionName '1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.5.0'
+    implementation 'com.google.android.material:material:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.squareup.okhttp3:okhttp:4.9.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1'
+    
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+}
+EOF
+        
+        echo "📁 Fixing source directory structure..."
+        # Move sources from wrong location to correct location
+        if [ -d "app/src/src/main" ]; then
+          echo "Moving sources from app/src/src/main to app/src/main"
+          rm -rf app/src/main
+          mv app/src/src/main app/src/main
+        fi
+        
+        # Create corrected AndroidManifest.xml
+        cat > app/src/main/AndroidManifest.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.chessbot">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="miui.permission.USE_INTERNAL_GENERAL_API" 
+        tools:ignore="ProtectedPermissions" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Chess Bot"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
+        android:hardwareAccelerated="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".TapExecutorService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
+            android:name=".BotPollerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+    </application>
+</manifest>
+EOF
+        
+        echo "✅ All fixes applied! Project structure:"
+        ls -la
+        echo "
+Source structure:"
+        find app/src/main -name "*.kt" | head -10
+        
+    - name: 📱 Setup Android SDK (Direct)
+      run: |
+        echo "📱 Installing Android SDK..."
+        
+        # Download Android command line tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip -q commandlinetools-linux-11076708_latest.zip
+        
+        # Setup Android SDK
+        export ANDROID_HOME=$PWD/android-sdk
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        mv cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+        
+        # Add to environment
+        echo "ANDROID_HOME=$PWD/android-sdk" >> $GITHUB_ENV
+        echo "$PWD/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$PWD/android-sdk/platform-tools" >> $GITHUB_PATH
+        
+        # Install components
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          "platforms;android-29" \
+          "build-tools;29.0.3" \
+          "platform-tools"
+          
+        echo "✅ Android SDK ready"
+        
+    - name: 🔨 Build APK
+      working-directory: fixed-chess-bot-app
+      run: |
+        echo "🔧 Setup build environment..."
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        chmod +x gradlew
+        
+        echo "🧹 Clean build..."
+        ./gradlew clean --stacktrace
+        
+        echo "🔨 Build APK for Redmi 9 Activ..."
+        ./gradlew assembleDebug --stacktrace
+        
+        echo "🔍 Check APK..."
+        find . -name "*.apk" -ls
+        
+        APK_COUNT=$(find . -name "*.apk" | wc -l)
+        if [ "$APK_COUNT" -eq 0 ]; then
+          echo "❌ No APK found!"
+          exit 1
+        fi
+        
+        echo "✅ APK built successfully!"
+        
+    - name: 📤 Upload Chess Bot APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: chess-bot-redmi9-final
+        path: fixed-chess-bot-app/**/*.apk
+        retention-days: 30
+        
+    - name: 🎉 SUCCESS
+      run: |
+        echo "# 🎉 SUCCESS - Chess Bot APK Built!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ APK successfully built for Redmi 9 Activ!" >> $GITHUB_STEP_SUMMARY
+        echo "📦 Download from 'chess-bot-redmi9-final' artifact above" >> $GITHUB_STEP_SUMMARY
