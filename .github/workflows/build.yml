@@ -1,0 +1,26 @@
+
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Unzip project
+        run: unzip -o server.zip -d ./project
+
+      - name: Build APK
+        run: |
+          cd project
+          ./gradlew assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chessgame
+          path: project/app/build/outputs/apk/release/*.apk
