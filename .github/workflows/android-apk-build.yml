@@ -1,4 +1,4 @@
-name: Build Android APK with Issue Tracker
+name: Build Chess Bot Android APK
 
 on:
   workflow_dispatch:
@@ -11,112 +11,22 @@ on:
         options:
           - debug
           - release
-      force_rebuild:
-        description: 'Force rebuild and re-run issue checks'
-        required: false
-        default: false
-        type: boolean
 
-env:
-  ISSUE_COUNT_FILE: 'build_issues_count.txt'
-  BUILD_LOG_FILE: 'detailed_build_log.txt'
-  
 jobs:
-  issue-detector:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      issue-count: ${{ steps.count-issues.outputs.count }}
-      build-needed: ${{ steps.count-issues.outputs.build-needed }}
-      
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Initialize issue counter
-        run: |
-          echo "🔍 ISSUE DETECTION AND TRACKING SYSTEM" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "=======================================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "$(date): Starting build issue analysis" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          # Initialize or read issue count
-          if [ ! -f "${{ env.ISSUE_COUNT_FILE }}" ] || [ "${{ github.event.inputs.force_rebuild }}" == "true" ]; then
-            echo "0" > ${{ env.ISSUE_COUNT_FILE }}
-            echo "📊 Issue counter initialized to 0" | tee -a ${{ env.BUILD_LOG_FILE }}
-          else
-            CURRENT_COUNT=$(cat ${{ env.ISSUE_COUNT_FILE }})
-            echo "📊 Current issue count: $CURRENT_COUNT" | tee -a ${{ env.BUILD_LOG_FILE }}
-          fi
-          
-      - name: Pre-build analysis
-        run: |
-          echo "🔎 PRE-BUILD ANALYSIS" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "=====================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          # Check if the app directory exists
-          if [ ! -d "extracted-server/fixed-chess-bot-app" ]; then
-            echo "❌ ERROR: App directory not found!" | tee -a ${{ env.BUILD_LOG_FILE }}
-            exit 1
-          fi
-          
-          cd extracted-server/fixed-chess-bot-app
-          
-          # Check for essential Android files
-          MISSING_FILES=""
-          
-          if [ ! -f "gradlew" ]; then
-            MISSING_FILES="$MISSING_FILES gradlew"
-          fi
-          
-          if [ ! -f "build.gradle" ] && [ ! -f "build.gradle.kts" ]; then
-            MISSING_FILES="$MISSING_FILES build.gradle/build.gradle.kts"
-          fi
-          
-          if [ ! -f "app/build.gradle" ] && [ ! -f "app/build.gradle.kts" ]; then
-            MISSING_FILES="$MISSING_FILES app/build.gradle"
-          fi
-          
-          if [ ! -f "settings.gradle" ] && [ ! -f "settings.gradle.kts" ]; then
-            MISSING_FILES="$MISSING_FILES settings.gradle"
-          fi
-          
-          if [ -n "$MISSING_FILES" ]; then
-            echo "❌ Missing essential files: $MISSING_FILES" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          else
-            echo "✅ All essential Android project files found" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          fi
-          
-      - name: Count issues
-        id: count-issues
-        run: |
-          ISSUE_COUNT=$(cat ${{ env.ISSUE_COUNT_FILE }})
-          echo "count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-          echo "build-needed=true" >> $GITHUB_OUTPUT
-          echo "📈 Issue count for this run: $ISSUE_COUNT" | tee -a ${{ env.BUILD_LOG_FILE }}
-
-  build-apk:
-    needs: issue-detector
-    runs-on: ubuntu-latest
-    if: needs.issue-detector.outputs.build-needed == 'true'
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Build status header
-        run: |
-          echo "🏗️  ANDROID APK BUILD PROCESS" | tee ${{ env.BUILD_LOG_FILE }}
-          echo "=============================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "📱 Project: Chess Bot App" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "🎯 Build Type: ${{ github.event.inputs.build_type }}" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "📊 Previous Issue Count: ${{ needs.issue-detector.outputs.issue-count }}" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "⏰ Started: $(date)" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '11'
+          distribution: 'temurin'
+          java-version: '17'
           cache: 'gradle'
           
       - name: Setup Android SDK
@@ -125,242 +35,70 @@ jobs:
           api-level: 29
           build-tools: 29.0.3
           
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-            
-      - name: Navigate to project and make gradlew executable
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        
+      - name: Install Android SDK Platform 29
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29"
+        
+      - name: Verify project structure
         run: |
-          echo "🔧 PREPARATION PHASE" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "===================" | tee -a ${{ env.BUILD_LOG_FILE }}
+          echo "📁 Verifying project structure..."
+          ls -la extracted-server/
+          ls -la extracted-server/fixed-chess-bot-app/
           
-          cd extracted-server/fixed-chess-bot-app
-          
-          if [ -f "gradlew" ]; then
-            chmod +x ./gradlew
-            echo "✅ Made gradlew executable" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          else
-            echo "❌ gradlew not found!" | tee -a ../../${{ env.BUILD_LOG_FILE }}
+          if [ ! -f "extracted-server/fixed-chess-bot-app/gradlew" ]; then
+            echo "❌ ERROR: gradlew not found at expected location"
             exit 1
           fi
           
-          # Check Gradle wrapper version
-          echo "📋 Gradle wrapper version:" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          ./gradlew --version | tee -a ../../${{ env.BUILD_LOG_FILE }}
+          if [ ! -f "extracted-server/fixed-chess-bot-app/app/build.gradle.kts" ]; then
+            echo "❌ ERROR: app/build.gradle.kts not found"
+            exit 1
+          fi
           
-      - name: Check Android SDK and dependencies
+          echo "✅ Project structure verified"
+          
+      - name: Make gradlew executable
+        run: chmod +x extracted-server/fixed-chess-bot-app/gradlew
+        
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-home-cache-cleanup: true
+          
+      - name: Clean build
+        working-directory: extracted-server/fixed-chess-bot-app
+        run: ./gradlew clean --stacktrace --info
+        
+      - name: Build APK
+        working-directory: extracted-server/fixed-chess-bot-app
         run: |
-          echo "🔍 DEPENDENCY CHECK" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "==================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          cd extracted-server/fixed-chess-bot-app
-          
-          # Check Android SDK installation
-          if [ -n "$ANDROID_HOME" ]; then
-            echo "✅ ANDROID_HOME: $ANDROID_HOME" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          else
-            echo "❌ ANDROID_HOME not set" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          fi
-          
-          # List available SDK platforms
-          echo "📱 Available SDK platforms:" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          ls -la $ANDROID_HOME/platforms/ | tee -a ../../${{ env.BUILD_LOG_FILE }} || echo "❌ Cannot list platforms" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          
-          # Check build tools
-          echo "🔨 Available build tools:" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          ls -la $ANDROID_HOME/build-tools/ | tee -a ../../${{ env.BUILD_LOG_FILE }} || echo "❌ Cannot list build tools" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          
-      - name: Initial build attempt with issue detection
-        id: initial-build
-        continue-on-error: true
+          echo "🏗️ Building ${{ github.event.inputs.build_type }} APK..."
+          ./gradlew assemble${{ github.event.inputs.build_type == 'release' && 'Release' || 'Debug' }} \
+            --stacktrace \
+            --info \
+            --scan
+            
+      - name: List build outputs
+        working-directory: extracted-server/fixed-chess-bot-app
         run: |
-          echo "🚀 INITIAL BUILD ATTEMPT" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "========================" | tee -a ${{ env.BUILD_LOG_FILE }}
+          echo "📱 Build outputs:"
+          find app/build/outputs/apk -name "*.apk" -exec ls -lh {} \; || echo "No APK files found"
           
-          cd extracted-server/fixed-chess-bot-app
-          
-          BUILD_SUCCESS=false
-          BUILD_OUTPUT=$(./gradlew assemble${{ github.event.inputs.build_type == 'release' && 'Release' || 'Debug' }} --stacktrace --info 2>&1) || true
-          
-          echo "$BUILD_OUTPUT" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          
-          if echo "$BUILD_OUTPUT" | grep -q "BUILD SUCCESSFUL"; then
-            BUILD_SUCCESS=true
-            echo "✅ Build succeeded on first attempt!" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          else
-            echo "❌ Build failed - analyzing issues..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          fi
-          
-          echo "build_success=$BUILD_SUCCESS" >> $GITHUB_OUTPUT
-          
-      - name: Issue analysis and automatic fixes
-        if: steps.initial-build.outputs.build_success != 'true'
-        run: |
-          echo "🔧 ISSUE ANALYSIS & AUTO-FIXES" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "==============================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          cd extracted-server/fixed-chess-bot-app
-          
-          CURRENT_ISSUES=0
-          FIXED_ISSUES=0
-          
-          # Common Android build issues and their fixes
-          
-          # Issue 1: Missing or wrong Android SDK version
-          if ! ls $ANDROID_HOME/platforms/ | grep -q "android-29"; then
-            echo "🔨 Issue #$((CURRENT_ISSUES+1)): Android SDK 29 not found" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            CURRENT_ISSUES=$((CURRENT_ISSUES+1))
-            
-            echo "📥 Installing Android SDK 29..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29" && FIXED_ISSUES=$((FIXED_ISSUES+1))
-          fi
-          
-          # Issue 2: Missing build tools
-          if ! ls $ANDROID_HOME/build-tools/ | grep -q "29.0.3"; then
-            echo "🔨 Issue #$((CURRENT_ISSUES+1)): Build tools 29.0.3 not found" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            CURRENT_ISSUES=$((CURRENT_ISSUES+1))
-            
-            echo "📥 Installing build tools 29.0.3..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3" && FIXED_ISSUES=$((FIXED_ISSUES+1))
-          fi
-          
-          # Issue 3: Gradle wrapper issues
-          if [ ! -d "gradle/wrapper" ]; then
-            echo "🔨 Issue #$((CURRENT_ISSUES+1)): Gradle wrapper missing" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            CURRENT_ISSUES=$((CURRENT_ISSUES+1))
-            
-            echo "📥 Regenerating Gradle wrapper..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            gradle wrapper && FIXED_ISSUES=$((FIXED_ISSUES+1))
-          fi
-          
-          # Issue 4: Permission issues
-          if [ ! -x "./gradlew" ]; then
-            echo "🔨 Issue #$((CURRENT_ISSUES+1)): gradlew not executable" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            CURRENT_ISSUES=$((CURRENT_ISSUES+1))
-            
-            echo "📥 Making gradlew executable..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            chmod +x ./gradlew && FIXED_ISSUES=$((FIXED_ISSUES+1))
-          fi
-          
-          # Issue 5: Memory issues
-          echo "🔨 Issue #$((CURRENT_ISSUES+1)): Potential memory issues" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          CURRENT_ISSUES=$((CURRENT_ISSUES+1))
-          
-          echo "📥 Setting Gradle memory options..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxPermSize=512m" >> gradle.properties && FIXED_ISSUES=$((FIXED_ISSUES+1))
-          
-          echo "📊 Issues detected: $CURRENT_ISSUES" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          echo "🛠️  Issues fixed: $FIXED_ISSUES" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          
-          # Update issue count file
-          echo "$CURRENT_ISSUES" > ../../${{ env.ISSUE_COUNT_FILE }}
-          
-      - name: Retry build after fixes
-        id: retry-build
-        continue-on-error: true
-        run: |
-          echo "🔄 RETRY BUILD AFTER FIXES" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "==========================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          cd extracted-server/fixed-chess-bot-app
-          
-          # Clear any previous build artifacts
-          echo "🧹 Cleaning previous build..." | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          ./gradlew clean
-          
-          BUILD_SUCCESS=false
-          BUILD_OUTPUT=$(./gradlew assemble${{ github.event.inputs.build_type == 'release' && 'Release' || 'Debug' }} --stacktrace --info 2>&1) || true
-          
-          echo "$BUILD_OUTPUT" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          
-          if echo "$BUILD_OUTPUT" | grep -q "BUILD SUCCESSFUL"; then
-            BUILD_SUCCESS=true
-            echo "✅ Build succeeded after fixes!" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            
-            # Reset issue count on successful build
-            echo "0" > ../../${{ env.ISSUE_COUNT_FILE }}
-          else
-            echo "❌ Build still failing - will need manual intervention" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            
-            # Extract specific error messages
-            echo "🔍 DETAILED ERROR ANALYSIS:" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            echo "$BUILD_OUTPUT" | grep -A 5 -B 5 "FAILURE\|ERROR\|Exception" | tee -a ../../${{ env.BUILD_LOG_FILE }} || echo "No specific errors found in output" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          fi
-          
-          echo "build_success=$BUILD_SUCCESS" >> $GITHUB_OUTPUT
-          
-      - name: Locate and verify APK
-        if: steps.initial-build.outputs.build_success == 'true' || steps.retry-build.outputs.build_success == 'true'
-        run: |
-          echo "📱 APK VERIFICATION" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "==================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          cd extracted-server/fixed-chess-bot-app
-          
-          # Find APK files
-          APK_PATH="app/build/outputs/apk/${{ github.event.inputs.build_type }}"
-          
-          if [ -d "$APK_PATH" ]; then
-            echo "✅ APK directory found: $APK_PATH" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            
-            APK_FILES=$(find "$APK_PATH" -name "*.apk" | head -5)
-            
-            if [ -n "$APK_FILES" ]; then
-              echo "🎉 APK files generated:" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-              for apk in $APK_FILES; do
-                APK_SIZE=$(du -h "$apk" | cut -f1)
-                echo "  📦 $apk ($APK_SIZE)" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-              done
-            else
-              echo "❌ No APK files found in output directory" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-            fi
-          else
-            echo "❌ APK output directory not found" | tee -a ../../${{ env.BUILD_LOG_FILE }}
-          fi
-          
-      - name: Upload APK artifacts
-        if: steps.initial-build.outputs.build_success == 'true' || steps.retry-build.outputs.build_success == 'true'
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: chess-bot-app-${{ github.event.inputs.build_type }}-apk
+          name: chess-bot-${{ github.event.inputs.build_type }}-apk
           path: extracted-server/fixed-chess-bot-app/app/build/outputs/apk/${{ github.event.inputs.build_type }}/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
           
       - name: Upload build logs
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-and-issues
+          name: build-failure-logs
           path: |
-            ${{ env.BUILD_LOG_FILE }}
-            ${{ env.ISSUE_COUNT_FILE }}
-          if-no-files-found: warn
-          
-      - name: Build summary
-        if: always()
-        run: |
-          echo "📋 BUILD SUMMARY" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "================" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "⏰ Completed: $(date)" | tee -a ${{ env.BUILD_LOG_FILE }}
-          
-          if [ -f "${{ env.ISSUE_COUNT_FILE }}" ]; then
-            FINAL_ISSUE_COUNT=$(cat ${{ env.ISSUE_COUNT_FILE }})
-            echo "📊 Final issue count: $FINAL_ISSUE_COUNT" | tee -a ${{ env.BUILD_LOG_FILE }}
-          fi
-          
-          if [ "${{ steps.initial-build.outputs.build_success }}" == "true" ] || [ "${{ steps.retry-build.outputs.build_success }}" == "true" ]; then
-            echo "🎉 Status: BUILD SUCCESSFUL" | tee -a ${{ env.BUILD_LOG_FILE }}
-            echo "📱 APK ready for download from artifacts" | tee -a ${{ env.BUILD_LOG_FILE }}
-          else
-            echo "❌ Status: BUILD FAILED" | tee -a ${{ env.BUILD_LOG_FILE }}
-            echo "🔧 Manual intervention may be required" | tee -a ${{ env.BUILD_LOG_FILE }}
-          fi
-          
-          echo "" | tee -a ${{ env.BUILD_LOG_FILE }}
-          echo "📄 Full build log available in artifacts" | tee -a ${{ env.BUILD_LOG_FILE }}
+            extracted-server/fixed-chess-bot-app/build/reports/
+            extracted-server/fixed-chess-bot-app/app/build/reports/
+          if-no-files-found: ignore
