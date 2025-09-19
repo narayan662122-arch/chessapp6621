@@ -1,8 +1,9 @@
+# .github/workflows/android-build.yml
 name: Android Build
 
 on:
   push:
-    branches: [main]    # ya koi feature branch
+    branches: [main]    # ya jis branch pe build chahiye
   pull_request:
     branches: [main]
 
@@ -15,14 +16,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up JDK (Java 17 recommended for recent Gradle/Android)
+      # 2. Set up JDK (Java 17 recommended)
       - name: Setup JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 17
 
-      # 3. Cache Gradle dependencies to speed up builds
+      # 3. Cache Gradle dependencies
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -31,10 +32,27 @@ jobs:
             ~/.gradle/wrapper/
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      # 4. Run Gradle build
-      - name: Build APK
-        run: ./gradlew assembleDebug  # or assembleRelease if signing ready
+      # 4. Run Gradle build for debug
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
 
+      # 5. Run Gradle build for release (optional, requires signing config)
+      - name: Build Release APK
+        run: ./gradlew assembleRelease || echo "Release build skipped if signing missing"
+
+      # 6. Upload Debug APK
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # 7. Upload Release APK (if generated)
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
       # 5. Upload APK as artifact for download
       - name: Upload APK
         uses: actions/upload-artifact@v3
