@@ -15,18 +15,22 @@ jobs:
       - name: Unzip every .zip safely
         shell: bash
         run: |
-          # Find all .zip files anywhere in the repo
+          # Disable immediate exit on error inside this block
+          set +e
+          # Find all .zip files and process each one
           find . -type f -name '*.zip' | while read f; do
             if [ -s "$f" ]; then
-              # Folder name = filename without .zip
               base="$(basename "$f" .zip)"
               echo "Unzipping $f -> $base/"
               mkdir -p "$base"
-              unzip -o "$f" -d "$base"
+              # Add || true so unzip errors (like empty file) won't fail the workflow
+              unzip -o "$f" -d "$base" || true
             else
               echo "Skipping empty zip: $f"
             fi
           done
+          # Re-enable exit-on-error for later steps
+          set -e
 
       - name: Commit extracted folders
         run: |
