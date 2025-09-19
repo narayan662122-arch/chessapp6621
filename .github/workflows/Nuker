@@ -1,0 +1,14 @@
+name: Nuker
+on:
+  workflow_dispatch:   # manual trigger only
+jobs:
+  wipe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Delete all tracked files
+        run: |
+          git rm -r *
+          git commit -m "Wipe repository files"
+          git push origin HEAD
