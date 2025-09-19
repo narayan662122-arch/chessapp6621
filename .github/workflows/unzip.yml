@@ -23,18 +23,13 @@ jobs:
               base="$(basename "$f" .zip)"
               echo "Unzipping $f -> $base/"
               mkdir -p "$base"
-              # Add || true so unzip errors (like empty file) won't fail the workflow
               unzip -o "$f" -d "$base" || true
             else
               echo "Skipping empty zip: $f"
             fi
           done
           # Re-enable exit-on-error for later steps
-          set -e
-
-      - name: Commit extracted folders
-        run: |
-          git config user.name "github-actions[bot]"
+          set -e          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "Auto-unzip all non-empty zip files" || echo "No changes to commit"
