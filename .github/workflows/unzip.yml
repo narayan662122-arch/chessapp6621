@@ -1,4 +1,4 @@
-name: Unzip all zips
+name: Unzip all zip files
 
 on:
   push:
@@ -9,17 +9,23 @@ jobs:
   unzip-all:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Unzip every .zip in repo
+      - name: Unzip every .zip safely
+        shell: bash
         run: |
-          # Find all .zip files (recursively) and unzip each to a folder
+          # Find all .zip files anywhere in the repo
           find . -type f -name '*.zip' | while read f; do
-            # Folder name = file name without .zip
-            base="$(basename "$f" .zip)"
-            mkdir -p "$base"
-            unzip -o "$f" -d "$base"
+            if [ -s "$f" ]; then
+              # Folder name = filename without .zip
+              base="$(basename "$f" .zip)"
+              echo "Unzipping $f -> $base/"
+              mkdir -p "$base"
+              unzip -o "$f" -d "$base"
+            else
+              echo "Skipping empty zip: $f"
+            fi
           done
 
       - name: Commit extracted folders
@@ -27,6 +33,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Auto-unzip all zip files" || echo "No changes"
-          git push          git commit -m "Auto-unzip zipped folders before deploy" || echo "No changes"
+          git commit -m "Auto-unzip all non-empty zip files" || echo "No changes to commit"
           git push
