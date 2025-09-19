@@ -1,14 +1,31 @@
-name: Nuker
+# .github/workflows/delete-workflows.yml
+name: Delete Workflows Directory
+
 on:
-  workflow_dispatch:   # manual trigger only
+  workflow_dispatch:      # sirf manual trigger se chale
+
 jobs:
-  wipe:
+  delete-workflows:
     runs-on: ubuntu-latest
+
     steps:
+      # 1. Checkout current branch
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Delete all tracked files
+
+      # 2. Git identity set karo
+      - name: Set Git identity
         run: |
-          git rm -r *
-          git commit -m "Wipe repository files"
-          git push origin HEAD
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # 3. Sirf .github/workflows directory ke files delete karo
+      - name: Delete workflows directory
+        run: |
+          git rm -r .github/workflows || echo "No workflows folder to delete"
+
+      # 4. Commit & push
+      - name: Commit and push deletions
+        run: |
+          git commit -m "Delete all files inside .github/workflows"
+          git push origin ${{ github.ref }}
