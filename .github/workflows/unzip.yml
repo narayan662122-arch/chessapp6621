@@ -1,4 +1,4 @@
-name: Unzip all zip files
+name: Unzip all zip files and commit
 
 on:
   push:
@@ -6,32 +6,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  unzip-all:
+  unzip-and-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ignore nested git folders
+        run: |
+          echo "git (1)/" >> .gitignore
+          echo "git/" >> .gitignore
+
       - name: Unzip every .zip safely
         shell: bash
         run: |
-          # Disable exit-on-error so workflow continues even if some zip fails
-          set +e
-
-          # Find all .zip files recursively
+          set +e  # continue even if unzip fails
           find . -type f -name '*.zip' | while IFS= read -r f; do
             echo "Processing zip: [$f]"
             if [ -s "$f" ]; then
-              # Folder name = filename without .zip
               base="$(basename "$f" .zip)"
               echo "Unzipping $f -> $base/"
               mkdir -p "$base"
-              # unzip command, errors ignored with || true
               unzip -o "$f" -d "$base" || echo "Failed to unzip $f"
             else
               echo "Skipping empty zip: $f"
             fi
           done
-
-          # Re-enable exit-on-error for any later steps
           set -e
+
+      - name: Commit and push extracted folders
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Add extracted zip folders" || echo "No changes to commit"
+          git push          set -e
