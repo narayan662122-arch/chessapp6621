@@ -1,0 +1,38 @@
+name: Unzip before deploy
+
+on:
+  push:
+    branches:
+      - main   # ya jo branch tum deploy kar rahe ho
+  workflow_dispatch:
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Unzip client
+        run: unzip -o "client (1).zip" -d client
+
+      - name: Unzip server
+        run: unzip -o "server (1).zip" -d server
+
+      - name: Unzip shared
+        run: unzip -o "shared (1).zip" -d shared
+
+      - name: Unzip upm
+        run: unzip -o "upm (1).zip" -d upm
+
+      # node_modules ko upload karne ki zaroorat nahi;
+      # Render ya Vercel `npm install` se dependencies fetch karega.
+      # Agar tumne zip rakha hai to bas ignore kar do.
+
+      - name: Commit unzipped files back
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto-unzip zipped folders before deploy" || echo "No changes"
+          git push
