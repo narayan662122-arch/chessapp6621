@@ -1,0 +1,17 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+android {
+    namespace 'com.example.chessbotapp'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.example.chessbotapp"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes { release { isMinifyEnabled false } }
+}
+dependencies { implementation 'androidx.appcompat:appcompat:1.7.0' }
