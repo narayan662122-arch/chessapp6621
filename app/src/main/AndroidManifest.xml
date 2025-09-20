@@ -1,0 +1,3 @@
+<manifest package="com.example.chessbotapp">
+<application android:label="ChessBotApp"/>
+</manifest>
